@@ -15,6 +15,7 @@ import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
 import { createViewmodel } from './viewmodel.js';
 import { createEffects } from './effects.js';
+import { createDeathcam } from './deathcam.js';
 import { makeLoadout, currentWeapon, canFire, takeRound, startReload, switchTo, stepWeapon } from './weapons.js';
 
 const FIXED_STEP = 1 / 60;
@@ -43,6 +44,7 @@ const combat = createCombat(world, effects, audio);
 const hud = createHud(world.colliders);
 const playerCtl = createPlayer(world);
 const viewmodel = createViewmodel(camera);
+const deathcam = createDeathcam();
 const bots = createBots(scene, world, combat, audio);
 
 // The player combatant shares the controller's position object, so movement
@@ -106,7 +108,7 @@ function onLockChange(locked) {
   }
 }
 
-function syncCamera() {
+function syncCamera(dt = 0) {
   const b = playerCtl.body;
   camera.position.set(b.pos.x, b.pos.y + b.eye, b.pos.z);
   let px = b.pitch + b.recoilPitch;
@@ -114,6 +116,12 @@ function syncCamera() {
   if (shakeT > 0) {
     px += (Math.random() - 0.5) * 0.06 * shakeT;
     yw += (Math.random() - 0.5) * 0.06 * shakeT;
+  }
+  // Dead: the deathcam steers the view toward the killer instead of the
+  // player's frozen aim. The camera stays where the body fell.
+  if (!player.alive && deathcam.isActive()) {
+    const dc = deathcam.update(dt, b.pos, b.eye);
+    if (dc) { px = dc.pitch; yw = dc.yaw; }
   }
   camera.rotation.set(px, yw, 0, 'YXZ');
   const w = currentWeapon(player.loadout);
@@ -219,8 +227,19 @@ function drainEvents() {
       const who = e.attacker ? e.attacker.name : '💥';
       hud.feedLine(`${who} ▸ ${e.target.name}${head}`, e.attacker && e.attacker.isPlayer ? 'good' : e.target.isPlayer ? 'bad' : '');
       if (e.attacker && e.attacker.isPlayer) audio.kill();
-      if (e.target.isPlayer) hud.setHint('You are out — spectating your team.');
+      if (e.target.isPlayer) {
+        hud.setHint('You are out — spectating your team.');
+        // Deathcam: the camera eases round to face the killer, and the card
+        // names them and the weapon — a death that teaches you something.
+        deathcam.begin(e.attacker || null, playerCtl.body.yaw, playerCtl.body.pitch);
+        hud.showDeathCard(
+          e.attacker ? e.attacker.name : 'THE BLAST',
+          e.weapon || (e.attacker ? 'Unknown weapon' : 'HE blast'),
+        );
+      }
     } else if (e.type === 'round') {
+      deathcam.reset();
+      hud.hideDeathCard();
       hud.banner(`ROUND ${e.round}`, e.round === 1 ? 'Plant the charge at A or B' : '', 2200);
     } else if (e.type === 'live') {
       if (hud.isBuyOpen()) {
@@ -276,7 +295,8 @@ function updateHud() {
     beepAt = S.time + (S.bomb.timer < 10 ? 0.5 : 1);
     audio.beep(S.bomb.timer < 10);
   }
-  viewmodel.setWeapon(w ? w.key : null);
+  // A dead player holds no gun: hide the viewmodel until the next round.
+  viewmodel.setWeapon(player.alive && w ? w.key : null);
 }
 
 function step(dt) {
@@ -329,7 +349,7 @@ function frame(now) {
       });
       input.releaseLock();
     }
-    syncCamera();
+    syncCamera(dt);
     shakeT = Math.max(0, shakeT - dt);
     bots.sync(S, dt);
     effects.step(dt);
@@ -383,7 +403,9 @@ function runShot(name) {
     playerCtl.body.pos.x = 0.6;
     playerCtl.body.pos.z = 14;
     settle(20);
-    aimAt(0, 1.6, -6);
+    // Frame the yard with the site-A beam and containers in view, so the
+    // menu shot reads as a place, not an empty lane.
+    aimAt(-7, 2.4, -11);
     hud.showOverlay('start');
     updateHud();
   } else if (name === 'buy') {
@@ -422,6 +444,21 @@ function runShot(name) {
     }
     if (foe) aimAt(foe.pos.x, 1.3, foe.pos.z);
     else aimAt(0, 1.5, -6);
+    // Fire one real shot at the target before freezing: the tracer and the
+    // muzzle flash are in the frame, and the shot is honest — the same
+    // fireHitscan path the player uses, with the same spread. Shot mode
+    // never runs frame(), so updateHud hasn't built the viewmodel yet:
+    // build it first, or onShot touches a null flash. Skip the shot if a
+    // bot dropped the player during the settle — the frame still reads.
+    if (foe && player.alive) {
+      const w = currentWeapon(player.loadout);
+      viewmodel.setWeapon(w.key);
+      const { eye, dir } = eyeAndDir();
+      const spread = playerCtl.spreadFor(w.def, false) + w.bloom;
+      combat.fireHitscan(S, player, eye, dir, spread, w.def);
+      viewmodel.onShot();
+      takeRound(player.loadout);
+    }
     updateHud();
   }
   paintTwiceThenReady();

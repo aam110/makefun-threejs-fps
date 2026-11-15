@@ -91,6 +91,11 @@
   #banner-title { font-size: 44px; font-weight: 700; letter-spacing: 0.06em; }
   #banner-sub { font-size: 16px; color: var(--muted); margin-top: 4px; }
 
+  #deathcard { position: fixed; left: 50%; bottom: 170px; transform: translateX(-50%); text-align: center; background: var(--surface); border: 1px solid var(--danger); border-radius: 8px; padding: 12px 28px; }
+  #deathcard .killed { font-size: 11px; letter-spacing: 0.3em; color: var(--muted); }
+  #death-name { font-size: 26px; font-weight: 700; letter-spacing: 0.05em; color: var(--danger); margin-top: 2px; }
+  #death-weapon { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
   #buy { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 520px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 20px 24px; pointer-events: auto; backdrop-filter: blur(4px); }
   #buy h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: 0.05em; }
   #buy p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
@@ -147,6 +152,7 @@
   <div id="hint"></div>
   <div id="progress" hidden><div id="progress-label">PLANTING</div><div id="progress-bar"><div id="progress-fill"></div></div></div>
   <div id="banner" hidden><div id="banner-title"></div><div id="banner-sub"></div></div>
+  <div id="deathcard" hidden><div class="killed">KILLED BY</div><div id="death-name"></div><div id="death-weapon"></div></div>
 </div>
 
 <div id="buy" hidden>
@@ -177,6 +183,7 @@
       <li><kbd>1</kbd><kbd>2</kbd> Weapons · <kbd>4</kbd><kbd>5</kbd> Grenades</li>
       <li><kbd>B</kbd> Buy menu</li>
       <li><kbd>E</kbd> Hold to plant the charge</li>
+      <li><kbd>☠</kbd> Deathcam shows who got you</li>
     </ul>
   </section>
 </div>

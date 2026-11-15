@@ -28,6 +28,9 @@ export function createHud(colliders) {
     banner: $('banner'),
     bannerTitle: $('banner-title'),
     bannerSub: $('banner-sub'),
+    deathcard: $('deathcard'),
+    deathName: $('death-name'),
+    deathWeapon: $('death-weapon'),
     buy: $('buy'),
     buyItems: [...document.querySelectorAll('#buy [data-item]')],
     progress: $('progress'),
@@ -135,6 +138,14 @@ export function createHud(colliders) {
       bannerTimer = setTimeout(() => { el.banner.hidden = true; }, ms);
     },
     hideBanner() { el.banner.hidden = true; },
+    // Deathcam card: names the killer and the weapon that got you. It stays
+    // up until the next round starts (main.js hides it on the round event).
+    showDeathCard(name, weapon) {
+      el.deathName.textContent = name;
+      el.deathWeapon.textContent = weapon || '';
+      el.deathcard.hidden = false;
+    },
+    hideDeathCard() { el.deathcard.hidden = true; },
     hitmarker(kill) {
       el.hitmarker.classList.add('on');
       el.hitmarker.classList.toggle('kill', !!kill);

@@ -94,6 +94,33 @@ export function createEffects(scene) {
     }
   }
 
+  // --- dust motes: golden air, always drifting across the yard ---
+  // A dusk desert yard has dust in the air; the motes sell the light and
+  // give the screenshots depth. One Points cloud, positions recycled in
+  // place, no allocation after setup.
+  const MOTES = 220;
+  const moteGeo = new THREE.BufferGeometry();
+  const motePos = new Float32Array(MOTES * 3);
+  const moteBaseY = new Float32Array(MOTES);
+  const motePhase = new Float32Array(MOTES);
+  const moteSpeed = new Float32Array(MOTES);
+  for (let i = 0; i < MOTES; i++) {
+    motePos[i * 3] = -31 + Math.random() * 62;
+    moteBaseY[i] = 0.3 + Math.random() * 6;
+    motePos[i * 3 + 1] = moteBaseY[i];
+    motePos[i * 3 + 2] = -22 + Math.random() * 44;
+    motePhase[i] = Math.random() * Math.PI * 2;
+    moteSpeed[i] = 0.35 + Math.random() * 0.5;
+  }
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+  const motes = new THREE.Points(moteGeo, new THREE.PointsMaterial({
+    color: 0xffd9a0, size: 0.07, transparent: true, opacity: 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  motes.frustumCulled = false;
+  scene.add(motes);
+  let moteT = 0;
+
   // --- explosion: flash sphere + light, both decaying ---
   const flash = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffc266, transparent: true, opacity: 0 }));
   flash.visible = false;
@@ -113,6 +140,15 @@ export function createEffects(scene) {
   }
 
   function step(dt) {
+    // Dust drifts downwind (+x) with a slow vertical bob; a mote that
+    // leaves the yard wraps to the upwind side.
+    moteT += dt;
+    for (let i = 0; i < MOTES; i++) {
+      motePos[i * 3] += moteSpeed[i] * dt;
+      if (motePos[i * 3] > 31) motePos[i * 3] = -31;
+      motePos[i * 3 + 1] = moteBaseY[i] + Math.sin(moteT * 0.5 + motePhase[i]) * 0.25;
+    }
+    moteGeo.attributes.position.needsUpdate = true;
     for (const t of tracers) {
       if (t.life <= 0) continue;
       t.life -= dt;

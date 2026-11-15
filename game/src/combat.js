@@ -36,7 +36,9 @@ export function createCombat(world, effects, audio) {
     return false;
   }
 
-  function damage(S, target, amount, part, attacker) {
+  // weapon: the name of the gun that fired the killing shot (null for blasts),
+  // carried on the kill event so the deathcam can name it.
+  function damage(S, target, amount, part, attacker, weapon) {
     if (!target.alive) return;
     let hpDamage = amount;
     if (target.armor > 0) {
@@ -50,7 +52,7 @@ export function createCombat(world, effects, audio) {
       target.hp = 0;
       target.alive = false;
       target.deathTime = S.time;
-      S.events.push({ type: 'kill', target, attacker, part });
+      S.events.push({ type: 'kill', target, attacker, part, weapon: weapon || null });
       if (attacker && attacker.isPlayer) {
         S.money += ECON.killBonus;
         S.stats.kills += 1;
@@ -98,7 +100,7 @@ export function createCombat(world, effects, audio) {
       if (part === 'head') dmg *= HEAD_MULT;
       if (part === 'legs') dmg *= 0.75;
       if (shooter.isPlayer) { S.stats.hits += 1; audio.hit(part === 'head'); }
-      damage(S, hitCombatant, dmg, part, shooter);
+      damage(S, hitCombatant, dmg, part, shooter, def ? def.name : null);
       effects.blood(end);
       return { hit: true, target: hitCombatant, part, damage: dmg };
     }

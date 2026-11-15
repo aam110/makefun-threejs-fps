@@ -19,6 +19,7 @@ export function createViewmodel(camera) {
   const flashLight = new THREE.PointLight(0xffc266, 0, 9, 1.8);
   let accentMat = new THREE.MeshStandardMaterial({ color: 0xff9a3d, roughness: 0.4, metalness: 0.3 });
   let flashMesh = null;
+  let flashStar = null;
   let flashLife = 0;
   let kick = 0;
   let reloadDip = 0;
@@ -54,8 +55,37 @@ export function createViewmodel(camera) {
     flashMesh = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0 }));
     flashMesh.rotation.x = -Math.PI / 2;
     flashMesh.position.set(0, 0.02, -s.body / 2 - s.barrel - 0.05);
+    // Star flash: a camera-facing 4-point star at the muzzle, shown with
+    // the cone — the flash reads as a burst, not a yellow triangle.
+    if (!flashStar) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const g = c.getContext('2d');
+      g.translate(32, 32);
+      g.fillStyle = '#ffe9b0';
+      for (let i = 0; i < 4; i++) {
+        g.rotate(Math.PI / 2);
+        g.beginPath();
+        g.moveTo(0, -3);
+        g.lineTo(4, -4);
+        g.lineTo(0, -30);
+        g.lineTo(-4, -4);
+        g.fill();
+      }
+      const grad = g.createRadialGradient(0, 0, 1, 0, 0, 12);
+      grad.addColorStop(0, 'rgba(255,255,240,1)');
+      grad.addColorStop(1, 'rgba(255,200,100,0)');
+      g.fillStyle = grad;
+      g.fillRect(-12, -12, 24, 24);
+      flashStar = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.34, 0.34),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }),
+      );
+    }
+    flashStar.position.copy(flashMesh.position);
+    flashStar.position.z -= 0.06;
     flashLight.position.copy(flashMesh.position);
-    group.add(...parts, flashMesh, flashLight);
+    group.add(...parts, flashMesh, flashStar, flashLight);
     group.position.set(HIP.x, HIP.y, HIP.z);
     current = key;
   }
@@ -68,7 +98,13 @@ export function createViewmodel(camera) {
   function onShot() {
     kick = 1;
     flashLife = 0.05;
-    flashMesh.material.opacity = 0.95;
+    // Guarded: onShot can run before the first setWeapon builds the gun
+    // (shot mode never runs frame()), and a null flash must not crash it.
+    if (flashMesh) flashMesh.material.opacity = 0.95;
+    if (flashStar) {
+      flashStar.material.opacity = 0.95;
+      flashStar.rotation.z = Math.random() * Math.PI; // every shot's star differs
+    }
     flashLight.intensity = 8;
   }
   function onReload() { reloadDip = 1; }
@@ -87,7 +123,8 @@ export function createViewmodel(camera) {
     if (flashLife > 0) {
       flashLife -= dt;
       if (flashLife <= 0) {
-        flashMesh.material.opacity = 0;
+        if (flashMesh) flashMesh.material.opacity = 0;
+        if (flashStar) flashStar.material.opacity = 0;
         flashLight.intensity = 0;
       }
     }
